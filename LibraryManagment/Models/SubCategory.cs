@@ -3,16 +3,18 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace LibraryManagment.Models
 {
-    public class Category
+    public class SubCategory
     {
         [Key]
         public int Id { get; set; }
+
+        [Required]
         public string Name { get; set; } = string.Empty;
 
-        [Column(TypeName = "nvarchar(max)")] 
-        public String? Description { get; set; }
 
-        public ICollection<SubCategory> SubCategories { get; set; } = new HashSet<SubCategory>();
+        [ForeignKey(nameof(Category))]
+        public int CategoryId { get; set; }
 
+        public Category Category { get; set; } = null!;
     }
 }
