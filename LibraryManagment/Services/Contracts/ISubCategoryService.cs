@@ -9,13 +9,13 @@ namespace LibraryManagment.Services.Contracts
         
         Task<Result<IEnumerable<SubCategoryResponse>>> GetAllSubCategoriesAsync();
 
-        Task<Result<SubCategoryResponse>> GetSubCategoryByIdAsync(int id);
+        Task<Result<SubCategoryResponse>> GetSubCategoryByIdAsync(int Id);
 
         Task<Result<SubCategoryResponse>> CreateSubCategoryAsync(CreateSubCategoryDto dto);
 
-        Task<Result<SubCategoryResponse>> UpdateSubCategoryAsync(int id, UpdateSubCategoryDto dto);
+        Task<Result<SubCategoryResponse>> UpdateSubCategoryAsync(int Id, UpdateSubCategoryDto dto);
 
-        Task<Result> DeleteSubCategoryAsync(int id);
+        Task<Result> DeleteSubCategoryAsync(int Id);
 
     }
 }

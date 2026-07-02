@@ -4,54 +4,61 @@ using LibraryManagment.Models;
 using LibraryManagment.Models.Dtos;
 using LibraryManagment.Models.Dtos.Categories;
 using LibraryManagment.Repository.Interfaces;
-using LibraryManagment.Repository.IRepository;
 using LibraryManagment.Services.Contracts;
 using MapsterMapper;
 
 namespace LibraryManagment.Services.Implementation
 {
-    public class CategoryService(
-        ICategoryRepository categoryRepository,
-        IMapper mapper)
-        : ICategoryService
+    public class CategoryService(IUnitWork unitWork, IMapper mapper) : ICategoryService
     {
         // Get all categories and include their related subcategories
         public async Task<Result<IEnumerable<CategoryResponseDto>>> GetAllCategoriesAsync()
         {
-            var categories = await categoryRepository.GetAllAsync(c => c.SubCategories);
+            // We access the repository through the unitWork manager to get data with its relations
+            var categories = await unitWork.Categories.GetAllAsync(includes: c => c.SubCategories);
 
-            // Mapster automatically maps the entities into CategoryResponseDto and populates the HashSet
+            // Mapster automatically converts the collection of entities into DTOs
             var response = mapper.Map<IEnumerable<CategoryResponseDto>>(categories);
             return Result.Ok(response);
         }
 
-        // Get one category by id and include its related subcategories
-        public async Task<Result<CategoryResponseDto>> GetCategoryByIdAsync(int id)
+        // Get one category by its unique ID and include its related subcategories
+        public async Task<Result<CategoryResponseDto>> GetCategoryByIdAsync(int Id)
         {
-            // We pass the id and the lambda expression to load the subcategories for this specific category
-            var category = await categoryRepository.GetByIdAsync(id, c => c.SubCategories);
+            // Find the specific category and load its subcategories at the same time
+            var category = await unitWork.Categories.GetByIdAsync(Id, c => c.SubCategories);
 
-            // If the category is not found, return a FluentResult failure
+            // If the category is not found, we stop the execution and return a custom NotFoundError
             if (category == null)
             {
-                return Result.Fail<CategoryResponseDto>(
-                    new NotFoundError(nameof(Category), id));
+                return Result.Fail<CategoryResponseDto>(new NotFoundError(nameof(Category), Id));
             }
 
             var response = mapper.Map<CategoryResponseDto>(category);
             return Result.Ok(response);
         }
 
-        // Create a new category
+        // Create a new category in the system
         public async Task<Result<CategoryResponseDto>> CreateCategoryAsync(CreateCategoryDto dto)
         {
-            // Map the DTO data into a new Category entity
+            // Check if another category already has the same name (ignoring uppercase/lowercase)
+            // This is an excellent use case for ExistsAsync because we only need a Yes/No answer
+            bool nameExists = await unitWork.Categories.ExistsAsync(c => c.Name.ToLower() == dto.Name.ToLower());
+            if (nameExists)
+            {
+                return Result.Fail<CategoryResponseDto>($"A category with the name '{dto.Name}' already exists.");
+            }
+
+            // Transform the incoming DTO data into a real database entity
             var category = mapper.Map<Category>(dto);
 
-            await categoryRepository.AddAsync(category);
+            // Add the new category object to the database context tracked in memory
+            await unitWork.Categories.AddAsync(category);
 
-            // Save changes and handle duplicate name errors using FluentResults
-            var saveResult = await categoryRepository.SaveAsync();
+            // Save all changes to the physical database inside a single transaction
+            var saveResult = await unitWork.SaveAsync();
+
+            // If the database transaction fails, return the collection of errors
             if (saveResult.IsFailed)
             {
                 return Result.Fail<CategoryResponseDto>(saveResult.Errors);
@@ -64,18 +71,20 @@ namespace LibraryManagment.Services.Implementation
         // Update an existing category name or description
         public async Task<Result<CategoryResponseDto>> UpdateCategoryAsync(int id, UpdateCategoryDto dto)
         {
-            // We do not need includes here because we are only updating the category itself
-            var category = await categoryRepository.GetByIdAsync(id);
+            // Look for the category in the database first. 
+            // We do not use ExistsAsync here because we actually need the object to modify it.
+            var category = await unitWork.Categories.GetByIdAsync(id);
 
             if (category == null)
             {
                 return Result.Fail<CategoryResponseDto>(new NotFoundError(nameof(Category), id));
             }
 
-            // Copy the new values from the DTO into the database entity
+            // Copy the new modified values from the incoming DTO directly into the database entity
             mapper.Map(dto, category);
 
-            var saveResult = await categoryRepository.SaveAsync();
+            // Persist the changes using the central Unit of Work coordinator
+            var saveResult = await unitWork.SaveAsync();
             if (saveResult.IsFailed)
             {
                 return Result.Fail<CategoryResponseDto>(saveResult.Errors);
@@ -85,33 +94,37 @@ namespace LibraryManagment.Services.Implementation
             return Result.Ok(response);
         }
 
-        // Delete a category from the database
+        // Delete a category completely from the database
         public async Task<Result> DeleteCategoryAsync(int id)
         {
-            var category = await categoryRepository.GetByIdAsync(id);
+            // Retrieve the category first to verify it exists before trying to remove it
+            var category = await unitWork.Categories.GetByIdAsync(id);
 
             if (category == null)
             {
                 return Result.Fail(new NotFoundError(nameof(Category), id));
             }
 
-            categoryRepository.Delete(category);
+            // Mark the category status as "Deleted" inside the memory context pool
+            unitWork.Categories.Delete(category);
 
-            var saveResult = await categoryRepository.SaveAsync();
+            // Confirm and execute the final deletion SQL script in the database server
+            var saveResult = await unitWork.SaveAsync();
             if (saveResult.IsFailed)
             {
-                return saveResult; // Returns the exact database error result
+                return saveResult; // Return the exact failure object to the controller
             }
 
             return Result.Ok();
         }
 
-        // Get a paginated list of categories (without subcategories for better speed)
+        // Get a paginated list of categories to improve API performance
         public async Task<Result<PagedResponseDto<CategoryResponseDto>>> GetPagedCategoriesAsync(int pageNumber, int pageSize)
         {
-            // The repository handles the Skip and Take methods automatically
-            var (categories, totalCount) = await categoryRepository.GetPagedAsync(pageNumber, pageSize);
+            // The repository automatically skips previous rows and takes only the requested page chunk
+            var (categories, totalCount) = await unitWork.Categories.GetPagedAsync(pageNumber, pageSize);
 
+            // Build the final response object wrapping the collection metadata and pagination info
             var response = new PagedResponseDto<CategoryResponseDto>
             {
                 Items = mapper.Map<IEnumerable<CategoryResponseDto>>(categories),

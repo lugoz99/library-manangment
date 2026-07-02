@@ -1,32 +1,30 @@
-﻿using FluentResults;
-using System.Linq.Expressions;
+﻿using System.Linq.Expressions;
 
 namespace LibraryManagment.Repository.Interfaces
 {
-    /// <summary>
-    /// Generic repository interface for basic CRUD and advanced queries.
-    /// </summary>
+    // T is a generic parameter. It represents any entity class (like Book or User).
     public interface IRepository<T> where T : class
     {
-        // Get all entities and optionally include related tables (1 to * relationships)
+        // Get all items from the database and include related tables
         Task<IEnumerable<T>> GetAllAsync(params Expression<Func<T, object>>[] includes);
 
-        // Get a single entity by ID and optionally include related tables
-        Task<T?> GetByIdAsync(int id, params Expression<Func<T, object>>[] includes);
+        // Find one single item by its Id number
+        Task<T?> GetByIdAsync(int Id, params Expression<Func<T, object>>[] includes);
 
-        // Check if an entity exists based on a condition
+        // Check if an item exists using a condition
         Task<bool> ExistsAsync(Expression<Func<T, bool>> predicate);
 
-        // Add a new entity to the database context
+        // Add a new item to the memory context (not saved in database yet)
         Task AddAsync(T entity);
 
-        // Mark an entity for deletion
+        // Mark an item to be deleted from the database
         void Delete(T entity);
 
-        // Save all changes to the database and return a FluentResult
-        Task<Result> SaveAsync();
-
-        // Get a paginated list of entities for better performance
-        Task<(IEnumerable<T> Items, int TotalCount)> GetPagedAsync(int pageNumber, int pageSize);
+        // Get a small list of items for pages (Example: page 1 with 10 items)
+        Task<(IEnumerable<T> Items, int TotalCount)> GetPagedAsync(
+            int pageNumber,
+            int pageSize,
+            Expression<Func<T, object>>? orderBy = null,
+            bool descending = false);
     }
 }

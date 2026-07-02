@@ -55,6 +55,8 @@ builder.Services.AddOpenApi();
 //==========================================================
 // DEPENDENCY INJECTION REPOSITORY AND SERVICES
 //===========================================================
+builder.Services.AddScoped<IUnitWork, UnitWork>();
+
 builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
 builder.Services.AddScoped<ICategoryRepository, CategoryRepository>();
 builder.Services.AddScoped<ICategoryService, CategoryService>();
