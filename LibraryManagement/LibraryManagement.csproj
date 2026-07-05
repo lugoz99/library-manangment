@@ -1,0 +1,42 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>c51b01af-c6b1-491d-8cd5-ef995014538b</UserSecretsId>
+    <RootNamespace>LibraryManagement</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="NewFolder\**" />
+    <Content Remove="NewFolder\**" />
+    <EmbeddedResource Remove="NewFolder\**" />
+    <None Remove="NewFolder\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AspNetCore.Scalar" Version="1.2.0" />
+    <PackageReference Include="DotNetEnv" Version="3.2.0" />
+    <PackageReference Include="FluentResults" Version="4.0.0" />
+    <PackageReference Include="FluentResults.Extensions.AspNetCore" Version="0.2.0" />
+    <PackageReference Include="Mapster" Version="10.0.8" />
+    <PackageReference Include="Mapster.DependencyInjection" Version="10.0.8" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.9" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.9" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="10.0.9">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.OpenApi" Version="2.9.0" />
+    <PackageReference Include="Scalar.AspNetCore" Version="2.16.7" />
+    <PackageReference Include="Swashbuckle.AspNetCore.SwaggerGen" Version="10.2.3" />
+  </ItemGroup>
+	<PropertyGroup>
+		<!-- This creates the XML file with all the code comments (summary tags) -->
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+		<GenerateLibraryLayout>true</GenerateLibraryLayout>
+		<!-- Warning 1591 happens when a public member has no XML comment. We ignore it. -->
+		<NoWarn>$(NoWarn);1591</NoWarn>
+	</PropertyGroup>
+</Project>
