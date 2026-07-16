@@ -1,115 +1,202 @@
-﻿using FluentResults;
+using FluentResults;
+using LibraryManagement.Common.Pagination;
 using LibraryManagement.Helpers.Errors;
 using LibraryManagement.Models;
-using LibraryManagement.Models.Dtos.Categories;
+using LibraryManagement.Models.DTOs.Categories;
 using LibraryManagement.Repository.Interfaces;
 using LibraryManagement.Services.Contracts;
+using Mapster;
 using MapsterMapper;
+using Microsoft.EntityFrameworkCore;
 
 namespace LibraryManagement.Services.Implementation
 {
     public class SubCategoryService(
-        IUnitWork unitWork, // 💡 NEW: We inject the central Unit of Work instead of multiple repositories
-        IMapper mapper) : ISubCategoryService
+        ISubCategoryRepository subCategoryRepository,
+        ICategoryRepository categoryRepository,
+        IMapper mapper)
+        : ISubCategoryService
     {
-        // Creates a new subcategory after checking if the parent category exists
-        public async Task<Result<SubCategoryResponse>> CreateSubCategoryAsync(CreateSubCategoryDto dto)
+        #region Read Methods (Queries)
+
+        public async Task<Result<IEnumerable<SubCategoryResponseDto>>> GetAllSubCategoriesAsync()
         {
-            // Check if the parent category exists in the database using the unitWork manager
-            var categoryExists = await unitWork.Categories.ExistsAsync(c => c.Id == dto.CategoryId);
-            if (!categoryExists)
-            {
-                return Result.Fail<SubCategoryResponse>(new NotFoundError(nameof(Category), dto.CategoryId));
-            }
+            // The repository already includes the parent Category and uses AsNoTracking
+            var subCategories = await subCategoryRepository
+                .GetAllQueryable()
+                .ToListAsync();
 
-            // Map the incoming DTO data into a new SubCategory database entity
-            var subCategory = mapper.Map<SubCategory>(dto);
-
-            // Add the new subcategory to the memory context
-            await unitWork.Subcategories.AddAsync(subCategory);
-
-            // 💡 IMPORTANT: We use the Unit of Work to save changes to the real database
-            var saveResult = await unitWork.SaveAsync();
-            if (saveResult.IsFailed)
-            {
-                return Result.Fail<SubCategoryResponse>(saveResult.Errors);
-            }
-
-            // Return the newly created subcategory mapped to a response DTO
-            return Result.Ok(mapper.Map<SubCategoryResponse>(subCategory));
+            return Result.Ok(subCategories.Adapt<IEnumerable<SubCategoryResponseDto>>());
         }
 
-        // Deletes an existing subcategory by its ID number
-        public async Task<Result> DeleteSubCategoryAsync(int id)
+        public async Task<Result<SubCategoryResponseDto>> GetSubCategoryByIdAsync(Guid id)
         {
-            // Look for the subcategory in the database before trying to delete it
-            var subCategory = await unitWork.Subcategories.GetByIdAsync(id);
-            if (subCategory == null)
+            var subCategory = await subCategoryRepository.GetByIdAsync(id);
+
+            if (subCategory is null)
             {
                 return Result.Fail(new NotFoundError(nameof(SubCategory), id));
             }
 
-            // Mark the entity as "Deleted" inside the database context in memory
-            unitWork.Subcategories.Delete(subCategory);
-
-            // Confirm and execute the deletion in the real database using the Unit of Work
-            var saveResult = await unitWork.SaveAsync();
-            if (saveResult.IsFailed)
-            {
-                return saveResult; // Return the exact database error result
-            }
-            return Result.Ok();
+            return Result.Ok(subCategory.Adapt<SubCategoryResponseDto>());
         }
 
-        // Retrieves all subcategories from the database
-        public async Task<Result<IEnumerable<SubCategoryResponse>>> GetAllSubCategoriesAsync()
+        public async Task<Result<IEnumerable<SubCategoryResponseDto>>> GetSubCategoriesByCategoryIdAsync(Guid categoryId)
         {
-            // Get the full list using the subcategories repository from unitWork
-            var subCategories = await unitWork.Subcategories.GetAllAsync();
+            var subCategories = await subCategoryRepository
+                .GetAllQueryable()
+                .Where(s => s.CategoryId == categoryId)
+                .ToListAsync();
 
-            var response = mapper.Map<IEnumerable<SubCategoryResponse>>(subCategories);
+            return Result.Ok(subCategories.Adapt<IEnumerable<SubCategoryResponseDto>>());
+        }
+
+        public async Task<Result<PagedResult<SubCategoryResponseDto>>> GetPagedSubCategoriesAsync(
+            int pageNumber,
+            int pageSize)
+        {
+            var query = subCategoryRepository
+                .GetAllQueryable()
+                .OrderByDescending(s => s.Name);
+
+            var paged = await query.ToPagedAsync(pageNumber, pageSize);
+
+            var response = new PagedResult<SubCategoryResponseDto>
+            {
+                Items = paged.Items.Adapt<IEnumerable<SubCategoryResponseDto>>(),
+                PageNumber = paged.PageNumber,
+                PageSize = paged.PageSize,
+                TotalCount = paged.TotalCount
+            };
+
             return Result.Ok(response);
         }
 
-        // Retrieves a specific subcategory by its unique ID
-        public async Task<Result<SubCategoryResponse>> GetSubCategoryByIdAsync(int Id)
-        {
-            // Search for the single record using the unitWork manager
-            var subCategory = await unitWork.Subcategories.GetByIdAsync(Id);
-            if (subCategory == null)
-            {
-                return Result.Fail(new NotFoundError(nameof(SubCategory), Id));
-            }
-            return Result.Ok(mapper.Map<SubCategoryResponse>(subCategory));
-        }
+        #endregion
 
-        // Updates an existing subcategory details and its parent category link
-        public async Task<Result<SubCategoryResponse>> UpdateSubCategoryAsync(int Id, UpdateSubCategoryDto dto)
-        {
-            // Verify that the subcategory exists in our system first
-            var subCategory = await unitWork.Subcategories.GetByIdAsync(Id);
-            if (subCategory == null)
-            {
-                return Result.Fail(new NotFoundError(nameof(SubCategory), Id));
-            }
+        #region Write Methods (Commands)
 
-            // Verify that the new parent category exists before making the link
-            var category = await unitWork.Categories.GetByIdAsync(dto.CategoryId);
-            if (category == null)
+        public async Task<Result<SubCategoryResponseDto>> CreateSubCategoryAsync(CreateSubCategoryDto dto)
+        {
+            // 1. Check Parent Category: Verify if the parent category exists in the database
+            // e.g., If CategoryId is 123, check if "History" category exists.
+            var parentCategory = await categoryRepository.GetByIdAsync(dto.CategoryId);
+
+            if (parentCategory is null)
             {
                 return Result.Fail(new NotFoundError(nameof(Category), dto.CategoryId));
             }
 
-            // Copy the modified data from the DTO into the existing database entity
+            // 2. Business Rule (No Parent Duplication): A subcategory name cannot be the same as the parent
+            // e.g., Category: "History" -> Subcategory cannot be "History".
+            if (string.Equals(parentCategory.Name, dto.Name, StringComparison.OrdinalIgnoreCase))
+            {
+                return Result.Fail(new ConflictError(
+                    $"A subcategory cannot have the exact same name as its parent category ('{parentCategory.Name}')."));
+            }
+
+            // 3. Check Duplicates: Verify if another sibling subcategory already uses this name
+            // e.g., Under "History", we cannot have two subcategories named "World War II".
+            if (await subCategoryRepository.ExistsByNameAsync(dto.Name, dto.CategoryId))
+            {
+                return Result.Fail(new ConflictError($"A subcategory with the name '{dto.Name}' already exists under this category."));
+            }
+
+            var subCategory = dto.Adapt<SubCategory>();
+            subCategory.Id = Guid.NewGuid();
+
+            await subCategoryRepository.AddAsync(subCategory);
+            await subCategoryRepository.SaveChangesAsync();
+
+            // 4. Refresh: Load the subcategory again to include the parent Category details in the response
+            var savedSubCategory = await subCategoryRepository.GetByIdAsync(subCategory.Id);
+
+            return Result.Ok(savedSubCategory!.Adapt<SubCategoryResponseDto>());
+        }
+
+        public async Task<Result<SubCategoryResponseDto>> UpdateSubCategoryAsync(Guid id, UpdateSubCategoryDto dto)
+        {
+            var subCategory = await subCategoryRepository.GetByIdAsync(id);
+
+            if (subCategory is null)
+            {
+                return Result.Fail(new NotFoundError(nameof(SubCategory), id));
+            }
+
+            // Get the target category. We start with the current category of this subcategory.
+            var targetCategory = subCategory.Category;
+
+            // 1. Check Category Change: If the user moves the subcategory, verify that the new parent category exists
+            // e.g., Moving "Database" subcategory from "Programming" (ID: 1) to "Networking" (ID: 2).
+            // change o move subcategory to other category
+            if (subCategory.CategoryId != dto.CategoryId)
+            {
+                targetCategory = await categoryRepository.GetByIdAsync(dto.CategoryId);
+
+                if (targetCategory is null)
+                {
+                    return Result.Fail(new NotFoundError(nameof(Category), dto.CategoryId));
+                }
+            }
+
+            // 2. Business Rule (No Parent Duplication): The subcategory name cannot be the same as its parent
+            // e.g., Category: "Databases" -> Subcategory cannot be "Databases".
+            if (string.Equals(targetCategory.Name, dto.Name, StringComparison.OrdinalIgnoreCase))
+            {
+                return Result.Fail(new ConflictError(
+                    $"A subcategory cannot have the exact same name as its parent category ('{targetCategory.Name}')."));
+            }
+
+            // 3. Optimization: We only check for duplicates in the database if the name or the parent category changed
+            //  ya sea la actual o la nueva a la que se está moviendo.
+            // e.g., If the user only changes the Description of "SQL Server", we skip the database duplicate check.
+            // if namechanged is true == are equals then is false no cambio
+            var nameChanged = !string.Equals(subCategory.Name, dto.Name, StringComparison.OrdinalIgnoreCase);
+            // move or not move
+            var categoryChanged = subCategory.CategoryId != dto.CategoryId;
+            var mustValidateDuplicates = nameChanged || categoryChanged;
+
+            if (mustValidateDuplicates)
+            {
+                // Verify if the name is already used under the target category (ignore this current subcategory ID)
+                // e.g., Check if another subcategory is already named "Oracle" under the target category "Databases".
+                if (await subCategoryRepository.ExistsByNameAsync(dto.Name, dto.CategoryId, id))
+                {
+                    return Result.Fail(new ConflictError($"A subcategory named '{dto.Name}' already exists under the target category."));
+                }
+            }
+
+            // 4. Map and Save: Copy the changes to the tracked entity and save to the database
             mapper.Map(dto, subCategory);
 
-            // Save the updated data using the central Unit of Work save method
-            var saveResult = await unitWork.SaveAsync();
-            if (saveResult.IsFailed)
-            {
-                return saveResult;
-            }
-            return Result.Ok(mapper.Map<SubCategoryResponse>(subCategory));
+            // Keep the in-memory navigation property in sync (relevant when CategoryId changed),
+            // so we can build the response without a second database roundtrip.
+            subCategory.Category = targetCategory;
+
+            subCategoryRepository.Update(subCategory);
+            await subCategoryRepository.SaveChangesAsync();
+
+       
+            return Result.Ok(subCategory.Adapt<SubCategoryResponseDto>());
         }
+
+        public async Task<Result> DeleteSubCategoryAsync(Guid id)
+        {
+            // 1. Check Existence: Verify if the subcategory exists before trying to delete it
+            var subCategory = await subCategoryRepository.GetByIdAsync(id);
+
+            if (subCategory is null)
+            {
+                return Result.Fail(new NotFoundError(nameof(SubCategory), id));
+            }
+
+            // 2. Optimization: Send only the ID to delete the record without doing extra database queries
+            subCategoryRepository.Delete(id);
+            await subCategoryRepository.SaveChangesAsync();
+
+            return Result.Ok();
+        }
+
+        #endregion
     }
 }

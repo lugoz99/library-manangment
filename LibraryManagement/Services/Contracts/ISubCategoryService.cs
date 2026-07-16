@@ -1,20 +1,20 @@
 ﻿using FluentResults;
-using LibraryManagement.Models.Dtos.Categories;
+using LibraryManagement.Common.Pagination;
+using LibraryManagement.Models.DTOs.Categories;
 
 namespace LibraryManagement.Services.Contracts
 {
     public interface ISubCategoryService
     {
-        
-        Task<Result<IEnumerable<SubCategoryResponse>>> GetAllSubCategoriesAsync();
+      
 
-        Task<Result<SubCategoryResponse>> GetSubCategoryByIdAsync(int id);
-
-        Task<Result<SubCategoryResponse>> CreateSubCategoryAsync(CreateSubCategoryDto dto);
-
-        Task<Result<SubCategoryResponse>> UpdateSubCategoryAsync(int id, UpdateSubCategoryDto dto);
-
-        Task<Result> DeleteSubCategoryAsync(int id);
-
+        // Controller-friendly aliases
+        Task<Result<IEnumerable<SubCategoryResponseDto>>> GetAllSubCategoriesAsync();
+        Task<Result<SubCategoryResponseDto>> GetSubCategoryByIdAsync(Guid id);
+        Task<Result<IEnumerable<SubCategoryResponseDto>>> GetSubCategoriesByCategoryIdAsync(Guid categoryId);
+        Task<Result<PagedResult<SubCategoryResponseDto>>> GetPagedSubCategoriesAsync(int pageNumber, int pageSize);
+        Task<Result<SubCategoryResponseDto>> CreateSubCategoryAsync(CreateSubCategoryDto dto);
+        Task<Result<SubCategoryResponseDto>> UpdateSubCategoryAsync(Guid id, UpdateSubCategoryDto dto);
+        Task<Result> DeleteSubCategoryAsync(Guid id);
     }
 }

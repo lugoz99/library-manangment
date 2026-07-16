@@ -1,18 +1,16 @@
 ﻿using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
 
 namespace LibraryManagement.Models
 {
-    public class Category
+    public class Category : BaseEntity
     {
-        [Key]
-        public int Id { get; set; }
+        [StringLength(100)]
         public string Name { get; set; } = string.Empty;
 
-        [Column(TypeName = "nvarchar(max)")] 
-        public String? Description { get; set; }
+        [StringLength(500)]
+        public string? Description { get; set; }
 
-        public ICollection<SubCategory> SubCategories { get; set; } = new HashSet<SubCategory>();
-
+        public ICollection<SubCategory> SubCategories { get; private set; }
+            = new HashSet<SubCategory>();
     }
 }

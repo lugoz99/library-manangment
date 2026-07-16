@@ -1,5 +1,5 @@
 ﻿using LibraryManagement.Models;
-using LibraryManagement.Models.Dtos.Categories;
+using LibraryManagement.Models.DTOs.Categories;
 using Mapster;
 
 namespace LibraryManagement.Mappings

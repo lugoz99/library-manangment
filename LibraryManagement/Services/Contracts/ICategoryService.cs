@@ -1,18 +1,22 @@
 ﻿using FluentResults;
-using LibraryManagement.Models.Dtos;
-using LibraryManagement.Models.Dtos.Categories;
+using LibraryManagement.Models.DTOs;
+using LibraryManagement.Models.DTOs.Categories;
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using LibraryManagement.Common.Pagination;
 
 namespace LibraryManagement.Services.Contracts
 {
     public interface ICategoryService
-    {
-        Task<Result<IEnumerable<CategoryResponseDto>>> GetAllCategoriesAsync();
-        Task<Result<CategoryResponseDto>> GetCategoryByIdAsync(int Id);
-        Task<Result<CategoryResponseDto>> CreateCategoryAsync(CreateCategoryDto dto);
-        // Services/Contracts/ICategoryService.cs
-        Task<Result<CategoryResponseDto>> UpdateCategoryAsync(int Id, UpdateCategoryDto dto);
-        Task<Result> DeleteCategoryAsync(int Id);
-        Task<Result<PagedResponseDto<CategoryResponseDto>>> GetPagedCategoriesAsync(int pageNumber, int pageSize);
+        {
+            // Controller-facing REST methods (single, clear signatures)
+            Task<Result<IEnumerable<CategoryResponseDto>>> GetAllCategoriesAsync();
+            Task<Result<CategoryResponseDto>> GetCategoryByIdAsync(Guid id);
+            Task<Result<PagedResult<CategoryResponseDto>>> GetPagedCategoriesAsync(int pageNumber, int pageSize);
 
-    }
+            Task<Result<CategoryResponseDto>> CreateCategoryAsync(CreateCategoryDto dto);
+            Task<Result<CategoryResponseDto>> UpdateCategoryAsync(Guid id, UpdateCategoryDto dto);
+            Task<Result> DeleteCategoryAsync(Guid id);
+        }
 }

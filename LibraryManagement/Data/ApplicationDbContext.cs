@@ -3,91 +3,50 @@ using Microsoft.EntityFrameworkCore;
 
 namespace LibraryManagement.Data
 {
-    public class ApplicationDbContext : DbContext
+    public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
+        : DbContext(options)
     {
-        public ApplicationDbContext(
-            DbContextOptions<ApplicationDbContext> options)
-            : base(options)
-        {
-        }
-
-        // =====================================================
-        // DBSETS
-        // =====================================================
-
         public DbSet<Category> Categories { get; set; }
-        public DbSet<SubCategory> SubCategories { get; set; }
 
-        // =====================================================
-        // MODEL CONFIGURATION
-        // =====================================================
+        public DbSet<SubCategory> SubCategories { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
 
-            // Category
-
-            modelBuilder.Entity<Category>()
-                .Property<DateTime>("CreatedAt");
-
-            modelBuilder.Entity<Category>()
-                .Property<DateTime>("UpdatedAt");
-
             modelBuilder.Entity<Category>()
                 .HasIndex(c => c.Name)
                 .IsUnique();
+
+            modelBuilder.Entity<Category>()
+                .HasMany(c => c.SubCategories)
+                .WithOne(s => s.Category)
+                .HasForeignKey(s => s.CategoryId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<SubCategory>()
+                .HasIndex(s => new { s.Name, s.CategoryId })
+                .IsUnique();
         }
 
-        // =====================================================
-        // AUDIT FIELDS (SHADOW PROPERTIES)
-        // =====================================================
-
-        public override async Task<int> SaveChangesAsync(
+        public override Task<int> SaveChangesAsync(
             CancellationToken cancellationToken = default)
         {
-            var entries = ChangeTracker.Entries()
-                .Where(e =>
-                    e.State == EntityState.Added ||
-                    e.State == EntityState.Modified);
-
-            foreach (var entry in entries)
+            foreach (var entry in ChangeTracker.Entries<BaseEntity>())
             {
-                var entityType = entry.Context.Model
-                    .FindEntityType(entry.Entity.GetType());
-
-                var createdProperty =
-                    entityType?.FindProperty("CreatedAt");
-
-                var updatedProperty =
-                    entityType?.FindProperty("UpdatedAt");
-
-                if (entry.State == EntityState.Added)
+                switch (entry.State)
                 {
-                    if (createdProperty != null)
-                    {
-                        entry.Property("CreatedAt")
-                            .CurrentValue = DateTime.UtcNow;
-                    }
+                    case EntityState.Added:
+                        entry.Entity.CreatedAt = DateTime.UtcNow;
+                        break;
 
-                    if (updatedProperty != null)
-                    {
-                        entry.Property("UpdatedAt")
-                            .CurrentValue = DateTime.UtcNow;
-                    }
-                }
-
-                if (entry.State == EntityState.Modified)
-                {
-                    if (updatedProperty != null)
-                    {
-                        entry.Property("UpdatedAt")
-                            .CurrentValue = DateTime.UtcNow;
-                    }
+                    case EntityState.Modified:
+                        entry.Entity.UpdatedAt = DateTime.UtcNow;
+                        break;
                 }
             }
 
-            return await base.SaveChangesAsync(cancellationToken);
+            return base.SaveChangesAsync(cancellationToken);
         }
     }
 }

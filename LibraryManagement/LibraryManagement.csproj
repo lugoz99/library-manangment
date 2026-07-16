@@ -20,6 +20,7 @@
     <PackageReference Include="DotNetEnv" Version="3.2.0" />
     <PackageReference Include="FluentResults" Version="4.0.0" />
     <PackageReference Include="FluentResults.Extensions.AspNetCore" Version="0.2.0" />
+    <PackageReference Include="JetBrains.Annotations" Version="2026.2.0" />
     <PackageReference Include="Mapster" Version="10.0.8" />
     <PackageReference Include="Mapster.DependencyInjection" Version="10.0.8" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.9" />

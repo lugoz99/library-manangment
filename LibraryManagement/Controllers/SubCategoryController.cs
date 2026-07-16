@@ -1,53 +1,70 @@
 ﻿using FluentResults.Extensions.AspNetCore;
-using LibraryManagement.Models.Dtos.Categories;
-using LibraryManagement.Services.Implementation;
-// Asegúrate de que tus DTOs de SubCategoría estén aquí o ajusta el namespace
-using LibraryManagement.Services.Contracts;     // Es mejor buena práctica usar la Interfaz (ISubCategoryService) si la tienes
+using LibraryManagement.Common.Pagination;
+using LibraryManagement.Models.DTOs.Categories;
+using LibraryManagement.Services.Contracts;
 using Microsoft.AspNetCore.Mvc;
 
 namespace LibraryManagement.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    // NOTA: Si creaste una interfaz ISubCategoryService, te sugiero cambiar SubCategoryService por ISubCategoryService aquí
-    public class SubCategoryController(SubCategoryService subCategoryService) : ControllerBase
+    public class SubCategoryController(ISubCategoryService subCategoryService) : ControllerBase
     {
-        // GET: api/SubCategory
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<SubCategoryResponse>>> GetAll()
+        public async Task<ActionResult<IEnumerable<SubCategoryResponseDto>>> GetAll()
         {
-            // Asumo que tu servicio tiene un método para subcategorías, por ejemplo: GetAllSubCategoriesAsync
             var result = await subCategoryService.GetAllSubCategoriesAsync();
             return result.ToActionResult();
         }
 
-        // GET: api/SubCategory/5
-        [HttpGet("{id:int}")]
-        public async Task<ActionResult<SubCategoryResponse>> GetById(int id)
+        [HttpGet("{id:guid}")]
+        public async Task<ActionResult<SubCategoryResponseDto>> GetById(Guid id)
         {
             var result = await subCategoryService.GetSubCategoryByIdAsync(id);
             return result.ToActionResult();
         }
 
-        // POST: api/SubCategory
+        [HttpGet("category/{categoryId:guid}")]
+        public async Task<ActionResult<IEnumerable<SubCategoryResponseDto>>> GetByCategoryId(
+            Guid categoryId)
+        {
+            var result = await subCategoryService
+                .GetSubCategoriesByCategoryIdAsync(categoryId);
+
+            return result.ToActionResult();
+        }
+
+        [HttpGet("paged")]
+        public async Task<ActionResult<PagedResult<SubCategoryResponseDto>>> GetPaged(
+            [FromQuery] PaginationParams pagination)
+        {
+
+            var result = await subCategoryService.GetPagedSubCategoriesAsync(
+                pagination.PageNumber,
+                pagination.PageSize);
+
+            return result.ToActionResult();
+        }
+
         [HttpPost]
-        public async Task<ActionResult<SubCategoryResponse>> Create([FromBody] CreateSubCategoryDto dto)
+        public async Task<ActionResult<SubCategoryResponseDto>> Create(
+            [FromBody] CreateSubCategoryDto dto)
         {
             var result = await subCategoryService.CreateSubCategoryAsync(dto);
             return result.ToActionResult();
         }
 
-        // PUT: api/SubCategory/5
-        [HttpPut("{id:int}")]
-        public async Task<ActionResult<SubCategoryResponse>> Update(int id, [FromBody] UpdateSubCategoryDto dto)
+        [HttpPut("{id:guid}")]
+        public async Task<ActionResult<SubCategoryResponseDto>> Update(
+            Guid id,
+            [FromBody] UpdateSubCategoryDto dto)
         {
             var result = await subCategoryService.UpdateSubCategoryAsync(id, dto);
             return result.ToActionResult();
         }
 
-        // DELETE: api/SubCategory/5
-        [HttpDelete("{id:int}")]
-        public async Task<IActionResult> Delete(int id)
+        [HttpDelete("{id:guid}")]
+        public async Task<IActionResult> Delete(Guid id)
         {
             var result = await subCategoryService.DeleteSubCategoryAsync(id);
             return result.ToActionResult();

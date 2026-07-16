@@ -1,20 +1,15 @@
 ﻿using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
 
 namespace LibraryManagement.Models
 {
-    public class SubCategory
+    public class SubCategory : BaseEntity
     {
-        [Key]
-        public int Id { get; set; }
-
         [Required]
+        [StringLength(100)]
         public string Name { get; set; } = string.Empty;
 
+        public Guid CategoryId { get; set; }
 
-        [ForeignKey(nameof(Category))]
-        public int CategoryId { get; set; }
-
-        public Category Category { get; set; } = null!;
+        public Category Category { get;  set; } = null!;
     }
 }
